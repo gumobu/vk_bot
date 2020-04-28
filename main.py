@@ -12,10 +12,11 @@ import pytz
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
 
-class Keyboard(object):
+class Keyboard:
     """
     Dedicated to creating keyboard
     """
+
     def __init__(self, response):
         self.response = response
         self.keyboard = VkKeyboard(one_time=False)
@@ -38,6 +39,7 @@ class Messages:
     """
     Processes messages. Re- and just sends them. Gets picture by using logging in as user
     """
+
     def __init__(self, peer_id=None, message=None, attachment=None, keyboard=None,
                  vk_session=None, text=None, num=None,
                  event=None,
@@ -59,7 +61,7 @@ class Messages:
                                   keyboard=self.keyboard)
 
     def resend(self):
-        elif self.num == 1:  # Info chat
+        if self.num == 1:  # Info chat
             return vk_session.method('messages.send', {'peer_id': <InfoChatId>, 'message': self.text,
                                                        'random_id': random.randint(-2147483648, +2147483648)})
         elif self.num == 2:  # Main chat
@@ -84,17 +86,16 @@ class Messages:
             Messages(peer_id=<AdminId>, message='Выход выполнен', keyboard=keyboard).send()
         if payload == 2:
             keyboard = VkKeyboard.get_empty_keyboard()
-            text = session_api.messages.getHistory(peer_id=233071173)['items'][1]['text']
+            text = session_api.messages.getHistory(peer_id=<AdminId>)['items'][1]['text']
             Messages(peer_id=<AdminId>, message=f'Сообщение с текстом "{text}"'
-                                                f' успешно отправлено в беседу <InfoChat>', keyboard=keyboard).send()
+                                                f' успешно отправлено в беседу СПИДИНФО', keyboard=keyboard).send()
             Messages(vk_session=vk_session, text=text, num=1).resend()
         if payload == 3:
             keyboard = VkKeyboard.get_empty_keyboard()
-            text = session_api.messages.getHistory(peer_id=233071173)['items'][1]['text']
+            text = session_api.messages.getHistory(peer_id=<AdminId>)['items'][1]['text']
             Messages(peer_id=<AdminId>, message=f'Сообщение с текстом "{text}"'
-                                                f' успешно отправлено в беседу <MainChat>', keyboard=keyboard).send()
+                                                f' успешно отправлено в беседу БАП1901', keyboard=keyboard).send()
             Messages(vk_session=vk_session, text=text, num=2).resend()
-
 
     @staticmethod
     def response_determination(admin, response, event, keyboard):
@@ -155,6 +156,7 @@ class DateAndTime:
     """"
     Processes date and time data
     """
+
     def __init__(self, element_id=None, start=False, time_param=None):
         self.id = element_id
         self.start = start
@@ -174,7 +176,6 @@ class DateAndTime:
             if int(delta.days) % 7 == 0:
                 return int(delta.days / 7)
             elif int(delta.days % 7) != 0:
-                print('even')
                 return int(delta.days // 7 + 1)
 
     def get_hour(self):
@@ -182,31 +183,50 @@ class DateAndTime:
         Gets hours count left to start or to the end of the class
         """
         if self.start is False:
-            return datetime.time(datetime.strptime(data.end_time[id], '%H:%M') - self.time_param).hour
+            return self.time_param.replace(tzinfo=None).hour \
+                   - datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour
+
         else:
-            return datetime.time(datetime.strptime(data.start_time[id], '%H:%M') - self.time_param).hour
+            return datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour \
+                   - self.time_param.replace(tzinfo=None).hour
 
     def get_minute(self):
         """
         Gets minutes count left to start or to the end of the class
         """
         if self.start is False:
-            return datetime.time(datetime.strptime(data.end_time[id], '%H:%M') - self.time_param).minute
+            self.delta_minute = self.time_param.replace(tzinfo=None).minute \
+                                - datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).minute
+            if self.delta_minute < 0:
+                self.hour -= 1
+                self.delta_minute = 60 - self.time_param.replace(tzinfo=None).minute \
+                                    + datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(
+                    tzinfo=None).minute
         else:
-            return datetime.time(datetime.strptime(data.start_time[id], '%H:%M') - self.time_param).minute
+            self.delta_minute = datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(tzinfo=None).minute \
+                                - self.time_param.replace(tzinfo=None).minute
+            if self.delta_minute < 0:
+                self.hour -= 1
+                self.delta_minute = 60 - self.time_param.replace(tzinfo=None).minute \
+                                    + datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(
+                    tzinfo=None).minute
+        return self.delta_minute
 
-    @staticmethod
-    def time_to(time_param, itr):
-        to_start, to_end = False
-        if DateAndTime(element_id=itr, start=True).get_hour() > 1:
+    def time_to(self):
+        to_start, to_end = None, None
+        if DateAndTime(time_param=self.time_param, start=True, element_id=self.id).get_hour() > 1:
+            #  If more than 1 hour left till start
             to_start = True
-        elif DateAndTime(element_id=itr, start=True).get_hour() == 0 \
-                and time_param.minute <= DateAndTime(element_id=itr, start=True).get_minute():
+        elif DateAndTime(start=True, time_param=self.time_param, element_id=self.id).get_hour() == 0 \
+                and DateAndTime(time_param=self.time_param, start=True, element_id=self.id).get_minute() >= 0:
+            #  If zero hour and more than or zero minutes left till start
             to_start = True
-        elif time_param.hour < DateAndTime(element_id=itr).get_hour():
+        elif DateAndTime(time_param=self.time_param, element_id=self.id).get_hour() < 0:
+            #  If the time had already passes
             to_end = True
-        elif time_param.hour == DateAndTime(element_id=itr).get_hour() \
-                and time_param.minute <= DateAndTime(element_id=itr).get_minute():
+        elif DateAndTime(time_param=self.time_param, element_id=self.id).get_hour() == 0 \
+                and DateAndTime(time_param=self.time_param, element_id=self.id).get_minute() < 0:
+            #  If the time had already passed
             to_end = True
         return to_start, to_end
 
@@ -216,38 +236,38 @@ class Classes(DateAndTime):
     """
     Processes all the data, connected with timetable
     """
-
     def word_hour(self):
         """
         Sets a correct case for hours count
         """
-        hour = Classes(time_param=self.time_param).get_hour()
+        hour = Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_hour()
         if hour in (1, 21):
-            add_hour_str = 'час'
+            self.add_hour_str = 'час'
         elif hour in (2, 3, 4, 22, 23, 24):
-            add_hour_str = 'часа'
+            self.add_hour_str = 'часа'
         else:
-            add_hour_str = 'часов'
-        return str(self.hour) + add_hour_str + ' '
+            self.add_hour_str = 'часов'
+        return str(hour) + ' ' + self.add_hour_str + ' '
 
     def word_minute(self):
         """
         Sets a correct case for minutes count
         """
-        minute = Classes(time_param=self.time_param).get_minute()
+        minute = Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_minute()
         if str(minute).endswith('1') and minute != 11:
-            return str(minute) + 'минута'
+            self.add_minute_str = 'минута'
         elif str(minute).endswith('2' or '3' or '4') and minute in (12, 13, 14):
-            return str(minute) + 'минуты'
+            self.add_minute_str = 'минуты'
         else:
-            return str(minute) + 'минут'
+            self.add_minute_str = 'минут'
+        return str(minute) + ' ' + self.add_minute_str
 
     def hurry_up(self):
         """"
         Adds some additional words, depending on the time left to class' start
         """
-        self.minute = Classes(time_param=self.time_param).get_minute()
-        self.hour = Classes(time_param=self.time_param).get_hour()
+        self.minute = int(Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_minute())
+        self.hour = abs(Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_hour())
         if self.start:
             if self.hour >= 1:
                 return ' Врeмени хватает'
@@ -266,7 +286,7 @@ class Classes(DateAndTime):
             if self.hour >= 1:
                 return 'Пара только началась.'
             elif 60 > self.minute >= 30:
-                return 'Осталосб совсем недолго!'
+                return 'Осталось совсем недолго!'
             elif 30 > self.minute >= 15:
                 return 'Нужно немного подождать.'
             elif 15 > self.minute >= 5:
@@ -277,19 +297,24 @@ class Classes(DateAndTime):
                 return 'Почему ты об этом спрашиваешь?'
 
     def word_total(self):
-        return Classes(time_param=self.time_param).word_hour() \
-               + Classes(time_param=self.time_param).word_minute() \
-               + '. ' + Classes(time_param=self.time_param).hurry_up()
+        self.w_hour = Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_hour()
+        self.w_minute = Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_minute()
+
+        return Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_hour() +\
+               Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_minute() +\
+               '. ' + Classes(time_param=self.time_param, element_id=self.id, start=self.start).hurry_up() + '.\n'
 
     def processing(self):
         """
         Processes the time and date finding out if there is a class right now, which one and which one will be the next
         """
-        day_id = self.now_cls.isoweekday()
         today = self.now_cls
+        day_id = int(self.now_cls.isoweekday())
         start, start_true, end_true = None, False, False
         if DateAndTime().week_counter() <= data.study_weeks_count:
-            if day_id == 6 or 7:  # If it is saturday or sunday
+            odd = is_odd(self.week_counter())
+
+            if day_id == (6 or 7):  # If it is saturday or sunday
                 if is_odd(DateAndTime().week_counter()) is True:
                     return (f'Сегодня {data.day_names[day_id]}, '
                             f'следующая пара в {data.day_names[1]}. \n'
@@ -310,196 +335,265 @@ class Classes(DateAndTime):
                                f'Начнется в {data.start_time[data.classes[1]["num_of_classes"][1]]} \n' \
                                f'Можно отдыхать.'
 
-            elif day_id == 1:  # If it is monday
+            if day_id == 1:  # If it is monday
                 # This block determines the first class serial number starting from zero
-                if is_odd(self.week_counter()) is True:
+                if odd is False:
                     start = 2
-                if self.week_counter() < 10 and is_odd(self.week_counter()) is False:
+                if odd < 10 and is_odd(self.week_counter()) is True:
                     start = 0
-                if self.week_counter() > 9 and is_odd(self.week_counter()) is False:
+                if odd > 9 and is_odd(self.week_counter()) is True:
                     start = 1
 
-                for _ in range(start, len(data.classes[1]["num_of_classes"]), 1):
-                    start_true, end_true = DateAndTime.time_to(today, _)
+                for _ in range(start, len(data.classes[1]["num_of_classes"])):
+                    start_true, end_true = DateAndTime(time_param=today, element_id=_).time_to()
                     if start_true or end_true is True:
                         break
 
                 if start_true is True:
                     return f'Следующая пара: {data.classes[1]["list_of_classes"][_]}.\n' \
-                           f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
-                if end_true is True:
-                    if _ < len(data.classes[1]["num_of_classes"]):
+                           f'До ее начала осталось ' \
+                           f'{Classes(time_param=today, element_id=_, start=True).word_total()}'
+                elif end_true is True:
+                    if _ < len(data.classes[1]["num_of_classes"]) - 1:
                         return f'Текущая пара: {data.classes[1]["list_of_classes"][_]}.\n' \
-                               f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                               f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                f'Следующая пара: {data.classes[1]["list_of_classes"][_ + 1]}.\n' \
                                f'Она начнется в {data.start_time[data.classes[1]["num_of_classes"][_ + 1]]}'
-                    elif _ == len(data.classes[1]["num_of_classes"]):
+                    elif _ == len(data.classes[1]["num_of_classes"]) - 1:
                         return f'Текущая пара: {data.classes[1]["list_of_classes"][_]}.\n' \
-                               f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                               f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                f'Следующая пара: {data.classes[2]["list_of_classes"][0]}.\n' \
                                f'Завтра в {data.start_time[data.classes[2]["num_of_classes"][0]]}'
+                else:
+                    return f'На сегодня пары закончились.\n' \
+                           f'Следующая пара: {data.classes[2]["list_of_classes"][0]}.\n' \
+                           f'В {data.day_names[2]} ' \
+                           f'в {data.start_time[data.classes[2]["num_of_classes"][0]]}\n' \
+                           f'Можно отдыхать!'
 
-            elif day_id == 2:  # If it is tuesday
+            if day_id == 2:  # If it is tuesday
                 start = 0
+
                 for _ in range(start, len(data.classes[2]["num_of_classes"]), 1):
-                    start_true, end_true = DateAndTime.time_to(today, _)
+                    start_true, end_true = DateAndTime(time_param=today, element_id=_).time_to()
                     if start_true or end_true is True:
                         break
+
                 if start_true is True:
                     return f'Следующая пара: {data.classes[2]["list_of_classes"][_]}.\n' \
-                           f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
-                if end_true is True:
-                    if _ < len(data.classes[2]["num_of_classes"]):
+                           f'До ее начала осталось {Classes(time_param=today, element_id=_, start=True).word_total()}'
+                elif end_true is True:
+                    if _ < len(data.classes[2]["num_of_classes"]) - 1:
                         return f'Текущая пара: {data.classes[2]["list_of_classes"][_]}.\n' \
-                               f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                               f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                f'Следующая пара: {data.classes[2]["list_of_classes"][_ + 1]}.\n' \
                                f'Она начнется в {data.start_time[data.classes[2]["num_of_classes"][_ + 1]]}'
-                    elif _ == len(data.classes[2]["num_of_classes"]):
+                    elif _ == len(data.classes[2]["num_of_classes"]) - 1:
                         return f'Текущая пара: {data.classes[2]["list_of_classes"][_]}.\n' \
-                               f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                               f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                f'Следующая пара: {data.classes[3]["list_of_classes"][0]}.\n' \
                                f'Завтра в {data.start_time[data.classes[3]["num_of_classes"][0]]}'
-
-            elif today.isoweekday == 3:  # If it is wednesday
-                start = 0
-                if (is_odd(self.week_counter()) is True and self.week_counter() > 11) or \
-                        is_odd(self.week_counter()) is False:
-                    limit = 3
                 else:
-                    limit = 2
-                for _ in range(start, limit, 1):
-                    start_true, end_true = DateAndTime.time_to(today, _)
+                    return f'На сегодня пары закончились.\n' \
+                           f'Следующая пара: {data.classes[3]["list_of_classes"][0]}.\n' \
+                           f'Завтра в {data.start_time[data.classes[3]["num_of_classes"][0]]}'
+
+            if day_id == 3:  # If it is wednesday
+                start = 0
+
+                if (odd is True and self.week_counter() > 11) or \
+                        odd is False:
+                    limit = 4
+                else:
+                    limit = 3
+                for _ in range(start, limit):
+                    start_true, end_true = DateAndTime(time_param=today, element_id=_).time_to()
                     if start_true or end_true is True:
                         break
+
                 if start_true is True:
-                    if is_odd(DateAndTime().week_counter()) is True:
+                    if odd is True:
                         return f'Следующая пара: {data.classes[4]["list_of_classes"][_]}.\n' \
-                               f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
+                               f'До ее начала осталось ' \
+                               f'{Classes(time_param=today, element_id=_, start=True).word_total()}'
                     else:
                         return f'Следующая пара: {data.classes[3]["list_of_classes"][_]}.\n' \
-                               f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
+                               f'До ее начала осталось ' \
+                               f'{Classes(time_param=today, element_id=_, start=True).word_total()}'
                 if end_true is True:
-                    if _ < limit:
-                        if is_odd(DateAndTime().week_counter()) is True:
+                    if _ < limit - 1:
+                        if odd is True:
                             return f'Текущая пара: {data.classes[4]["list_of_classes"][_]}.\n' \
-                                   f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                   f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                    f'Следующая пара: {data.classes[4]["list_of_classes"][_ + 1]}.\n' \
                                    f'Она начнется в {data.start_time[data.classes[4]["num_of_classes"][_ + 1]]}'
                         else:
                             return f'Текущая пара: {data.classes[3]["list_of_classes"][_]}.\n' \
-                                   f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                   f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                    f'Следующая пара: {data.classes[3]["list_of_classes"][_ + 1]}.\n' \
                                    f'Она начнется в {data.start_time[data.classes[4]["num_of_classes"][_ + 1]]}'
-                    elif _ == limit:
-                        if is_odd(DateAndTime().week_counter()) is True:
-                            if DateAndTime().week_counter() < 6:
+                    elif _ == limit - 1:
+                        if odd is True:
+                            if self.week_counter() < 6:
                                 return f'Текущая пара: {data.classes[4]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n'\
                                        f'Следующая пара: {data.classes[5]["list_of_classes"][0]}.\n' \
                                        f'Завтра в {data.start_time[data.classes[5]["num_of_classes"][0]]}'
                             else:
                                 return f'Текущая пара: {data.classes[4]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n'\
                                        f'Следующая пара: {data.classes[6]["list_of_classes"][0]}.\n' \
                                        f'Завтра в {data.start_time[data.classes[6]["num_of_classes"][0]]}'
                         else:
-                            if DateAndTime().week_counter() < 6:
+                            if self.week_counter() < 6:
                                 return f'Текущая пара: {data.classes[3]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n'\
                                        f'Следующая пара: {data.classes[5]["list_of_classes"][0]}.\n' \
                                        f'Завтра в {data.start_time[data.classes[5]["num_of_classes"][0]]}'
                             else:
                                 return f'Текущая пара: {data.classes[3]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n'\
                                        f'Следующая пара: {data.classes[6]["list_of_classes"][0]}.\n' \
                                        f'Завтра в {data.start_time[data.classes[6]["num_of_classes"][0]]}'
 
-            elif today.isoweekday == 4:  # If it is thursday
+                else:
+                    if self.week_counter() < 6:
+                        return f'На сегодня пары закончились.\n' \
+                               f'Следующая пара: {data.classes[5]["list_of_classes"][0]}.\n' \
+                               f'Завтра в {data.start_time[data.classes[5]["num_of_classes"][0]]}'
+                    else:
+                        return f'На сегодня пары закончились.\n' \
+                               f'Следующая пара: {data.classes[6]["list_of_classes"][0]}.\n' \
+                               f'Завтра в {data.start_time[data.classes[6]["num_of_classes"][0]]}'
+
+            if day_id == 4:  # If it is thursday
                 start = 1
                 for _ in range(start, len(data.classes[5]["num_of_classes"]), 1):
-                    start_true, end_true = DateAndTime.time_to(today, _)
+                    start_true, end_true = DateAndTime(time_param=today, element_id=_).time_to()
                     if start_true or end_true is True:
                         break
+
                 if start_true is True:
-                    if DateAndTime().week_counter() < 6:
+                    if self.week_counter() < 6:
                         return f'Следующая пара: {data.classes[5]["list_of_classes"][_]}.\n' \
-                               f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
+                               f'До ее начала осталось' \
+                               f' {Classes(time_param=today, element_id=_, start=True).word_total()}'
                     else:
                         return f'Следующая пара: {data.classes[6]["list_of_classes"][_]}.\n' \
-                               f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
+                               f'До ее начала осталось ' \
+                               f'{Classes(time_param=today, element_id=_, start=True).word_total()}'
                 if end_true is True:
-                    if _ < len(data.classes[5]["num_of_classes"]):
-                        if DateAndTime().week_counter() < 6:
-                            return f'Следующая пара: {data.classes[5]["list_of_classes"][_]}.\n' \
-                                   f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
+                    if _ < len(data.classes[5]["num_of_classes"]) - 1:
+                        if self.week_counter() < 6:
+                            return f'Текущая пара: {data.classes[5]["list_of_classes"][_]}.\n' \
+                                   f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
+                                   f'Следующая пара: {data.classes[5]["list_of_classes"][_ + 1]}.\n' \
+                                   f'Она начнется в {data.start_time[data.classes[5]["num_of_classes"][_ + 1]]}'
                         else:
-                            return f'Следующая пара: {data.classes[6]["list_of_classes"][_]}.\n' \
-                                   f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
-                    elif _ == len(data.classes[5]["num_of_classes"]):
+                            return f'Текущая пара: {data.classes[6]["list_of_classes"][_]}.\n' \
+                                   f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
+                                   f'Следующая пара: {data.classes[6]["list_of_classes"][_ + 1]}.\n' \
+                                   f'Она начнется в {data.start_time[data.classes[6]["num_of_classes"][_ + 1]]}'
+
+                    elif _ == len(data.classes[5]["num_of_classes"]) - 1:
                         return f'Текущая пара: {data.classes[5]["list_of_classes"][_]}.\n' \
                                f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
                                f'Следующая пара: {data.classes[7]["list_of_classes"][0]}.\n' \
-                               f'Завтра в {data.start_time[data.classes[7]["num_of_classes"][0]]}'
-
-            elif today.isoweekday == 5:  # If it is friday
-                start = 0
-                if (is_odd(DateAndTime().week_counter()) is True and DateAndTime().week_counter() < 11) \
-                        or (is_odd(DateAndTime().week_counter()) is False and 8 < DateAndTime().week_counter() < 18):
-                    limit = 3
+                               f'Завтра в {data.start_time[data.classes[7]["num_of_classes"][0]]}.'
                 else:
-                    limit = 2
-                for _ in range(start, limit, 1):
-                    start_true, end_true = DateAndTime.time_to(today, _)
+                    return f'На сегодня пары закончились.\n' \
+                           f'Следующая пара: {data.classes[7]["list_of_classes"][0]}.\n' \
+                           f'Завтра в {data.start_time[data.classes[7]["num_of_classes"][0]]}.'
+
+            if day_id == 5:  # If it is friday
+                start = 0
+
+                if (odd is True and self.week_counter() < 11) \
+                        or (odd is False and 8 < self.week_counter() < 18):
+                    limit = 4
+                else:
+                    limit = 3
+
+                for _ in range(start, limit):
+                    start_true, end_true = DateAndTime(time_param=today, element_id=_).time_to()
                     if start_true or end_true is True:
                         break
+
                 if start_true is True:
-                    if is_odd(DateAndTime().week_counter()) is True:
+                    if odd is True:
                         return f'Следующая пара: {data.classes[8]["list_of_classes"][_]}.\n' \
-                               f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
+                               f'До ее начала осталось ' \
+                               f'{Classes(time_param=today, element_id=_, start=True).word_total()}'
                     else:
                         return f'Следующая пара: {data.classes[7]["list_of_classes"][_]}.\n' \
-                               f'До ее начала осталось {Classes(time_param=today, start=True).word_total()}'
+                               f'До ее начала осталось ' \
+                               f'{Classes(time_param=today, element_id=_, start=True).word_total()}'
                 if end_true is True:
-                    if _ < limit:
-                        if is_odd(DateAndTime().week_counter()) is True:
+                    if _ < limit - 1:
+                        if odd is True:
                             return f'Текущая пара: {data.classes[8]["list_of_classes"][_]}.\n' \
-                                   f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                   f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                    f'Следующая пара: {data.classes[8]["list_of_classes"][_ + 1]}.\n' \
                                    f'Она начнется в {data.start_time[data.classes[8]["num_of_classes"][_ + 1]]}'
                         else:
                             return f'Текущая пара: {data.classes[7]["list_of_classes"][_]}.\n' \
-                                   f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                   f'До ее конца осталось {Classes(time_param=today, element_id=_).word_total()}\n' \
                                    f'Следующая пара: {data.classes[7]["list_of_classes"][_ + 1]}.\n' \
                                    f'Она начнется в {data.start_time[data.classes[7]["num_of_classes"][_ + 1]]}'
-                    elif _ == limit:
-                        if DateAndTime().week_counter() < 18:
-                            if is_odd(DateAndTime().week_counter()) is True:
+                    elif _ == limit - 1:
+                        if self.week_counter() < 18:
+                            if odd is True:
                                 return f'Текущая пара: {data.classes[8]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось' \
+                                       f' {Classes(time_param=today, element_id=_).word_total()}\n' \
                                        f'Следующая пара: {data.classes[0]["list_of_classes"][0]}.\n' \
                                        f'Начнется в {data.day_names[1]} в ' \
                                        f'{data.start_time[data.classes[1]["num_of_classes"][0]]} \n' \
                                        f'Можно отдыхать.'
                             else:
                                 return f'Текущая пара: {data.classes[7]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось ' \
+                                       f' {Classes(time_param=today, element_id=_).word_total()}\n' \
                                        f'Следующая пара: {data.classes[0]["list_of_classes"][0]}.\n' \
                                        f'Начнется в {data.day_names[1]} в ' \
                                        f'{data.start_time[data.classes[1]["num_of_classes"][0]]} \n' \
                                        f'Можно отдыхать.'
-                        elif DateAndTime().week_counter() == 18:
-                            if is_odd(DateAndTime().week_counter()) is True:
+                        elif self.week_counter() == 18:
+                            if odd is True:
                                 return f'Текущая пара: {data.classes[8]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось ' \
+                                       f' {Classes(time_param=today, element_id=_).word_total()}\n' \
                                        f'Следующей пары не будет! Это последний учебный день! \n' \
                                        f'Впереди только каникулы и лето, полное открытий.'
                             else:
                                 return f'Текущая пара: {data.classes[7]["list_of_classes"][_]}.\n' \
-                                       f'До ее конца осталось {Classes(time_param=today).word_total()}\n' \
+                                       f'До ее конца осталось ' \
+                                       f' {Classes(time_param=today, element_id=_).word_total()}\n' \
                                        f'Следующей пары не будет! Это последний учебный день! \n' \
                                        f'Впереди только каникулы и лето, полное открытий.'
                         else:
                             return 'Да сегодня же каникулы! Ты чего? Отдыхай и радуйся жизни, пока молодой.'
+                else:
+                    if odd is False and self.week_counter() < 10:
+                        return f'На сегодня пары закончились.\n' \
+                               f'Следующая пара: {data.classes[1]["list_of_classes"][0]}.\n' \
+                               f'В {data.day_names[1]} ' \
+                               f'в {data.start_time[data.classes[1]["num_of_classes"][0]]}\n' \
+                               f'Можно отдыхать!'
+
+                    elif odd is False and self.week_counter() > 9:
+                        return f'На сегодня пары закончились.\n' \
+                               f'Следующая пара: {data.classes[1]["list_of_classes"][1]}.\n' \
+                               f'В {data.day_names[1]} ' \
+                               f'в {data.start_time[data.classes[1]["num_of_classes"][1]]}\n' \
+                               f'Можно отдыхать!'
+
+                    elif odd is True:
+                        return f'На сегодня пары закончились.\n' \
+                               f'Следующая пара: {data.classes[0]["list_of_classes"][0]}.\n' \
+                               f'В {data.day_names[1]} ' \
+                               f'в {data.start_time[data.classes[0]["num_of_classes"][0]]}\n' \
+                               f'Можно отдыхать!'
 
 
 def is_odd(param):  # Finds out if the parameter odd or not
@@ -509,12 +603,11 @@ def is_odd(param):  # Finds out if the parameter odd or not
         return False
 
 
-def main(longpoll):  # Main function
+def main(events):  # Main function
     try:
-        for event in longpoll.listen():
+        for event in events.listen():
 
             if event.type == VkBotEventType.MESSAGE_NEW:  # For messages in chat
-                # print(event.raw)
                 response = event.message.text.lower()
                 keyboard = Keyboard(response).create_main()
                 if int(event.message.peer_id) != 233071173:
