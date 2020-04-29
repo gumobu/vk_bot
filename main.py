@@ -16,12 +16,14 @@ class Keyboard:
     """
     Dedicated to creating keyboard
     """
-
     def __init__(self, response):
         self.response = response
         self.keyboard = VkKeyboard(one_time=False)
 
     def create_main(self):
+        """
+        Creates a keyboard for resending messages to chats
+        """
         if self.response == '.логин 12681268':
             self.keyboard.add_button('Отправить сообщение в <Chat1>',
                                      color=VkKeyboardColor.PRIMARY, payload='2')
@@ -39,7 +41,6 @@ class Messages:
     """
     Processes messages. Re- and just sends them. Gets picture by using logging in as user
     """
-
     def __init__(self, peer_id=None, message=None, attachment=None, keyboard=None,
                  vk_session=None, text=None, num=None,
                  event=None,
@@ -56,16 +57,22 @@ class Messages:
         self.admin = admin
 
     def send(self):
+        """
+        Sends messages
+        """
         session_api.messages.send(peer_id=self.peer_id, message=self.message,
                                   attachment=self.attachment, random_id=random.randint(-2147483648, +2147483648),
                                   keyboard=self.keyboard)
 
     def resend(self):
+        """
+        Resends messages
+        """
         if self.num == 1:  # Info chat
-            return vk_session.method('messages.send', {'peer_id': <InfoChatId>, 'message': self.text,
+            return vk_session.method('messages.send', {'peer_id': 2000000003, 'message': self.text,
                                                        'random_id': random.randint(-2147483648, +2147483648)})
         elif self.num == 2:  # Main chat
-            return vk_session.method('messages.send', {'peer_id': <MainChatId>, 'message': self.text,
+            return vk_session.method('messages.send', {'peer_id': 2000000002, 'message': self.text,
                                                        'random_id': random.randint(-2147483648, +2147483648)})
 
     def name_determination(self):
@@ -100,10 +107,10 @@ class Messages:
     @staticmethod
     def response_determination(admin, response, event, keyboard):
         """
-        Determines and processes incoming messages
+        Determines responses and processes incoming messages
         """
-        if admin is False:
-            if response == '.команды':
+        if admin is False:  # If not a private message from bot owner
+            if response == '.команды':  # If not a private message from bot owner
                 name = Messages(event=event).name_determination()
                 Messages(peer_id=event.message.peer_id,
                          message=f'Привет, {name}! \nВот команды для бота, '
@@ -115,7 +122,7 @@ class Messages:
                                  f'\n5) .мем - Убогий (смешной) мем'
                                  f'\n6) .дист - Актуальное расписание дистанционных занятий').send()
 
-            elif response == '.пара':
+            elif response == '.пара':  # Sends informations about current and next class
                 Messages(peer_id=event.message.peer_id, message=f'{Classes().processing()}').send()
 
             elif response == '.расп':  # Send a picture of timetable
@@ -131,18 +138,18 @@ class Messages:
                          attachment=user_actions.Pictures.get_single('-' + data.home_id,
                                                                      user_actions.session_api, 1)).send()
 
-            elif response == '.мем':
+            elif response == '.мем':  # Sends funny picture(s)
                 Messages(peer_id=event.message.peer_id, message='Ваши мемы прибыли, капитан!',
                          attachment=user_actions.Pictures.get_multiple(user_actions.session_api)).send()
 
-            elif response == '.дист':
+            elif response == '.дист':  # Temporary function. Sends a distance learning timetable
                 Messages(peer_id=event.message.peer_id,
                          message=f'Расписание дистанционных занятий,'
                                  f' актуальное на {DateAndTime().now_cls.strftime("%d.%m.%Y")}',
                          attachment=user_actions.Pictures.get_single('-' + data.home_id,
                                                                      user_actions.session_api, 7)).send()
 
-        elif admin is True:
+        elif admin is True:  # If the message is private from bot owner
             if response == '.логин 12681268':
                 name = Messages(event=event).name_determination()
                 Messages(peer_id=event.message.peer_id,
@@ -183,22 +190,30 @@ class DateAndTime:
         Gets hours count left to start or to the end of the class
         """
         if self.start is False:
-            return self.time_param.replace(tzinfo=None).hour \
-                   - datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour
-
+            if datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).minute \
+                    - self.time_param.replace(tzinfo=None).minute < 0:
+                return datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour \
+                       - self.time_param.replace(tzinfo=None).hour - 1
+            else:
+                return datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour \
+                       - self.time_param.replace(tzinfo=None).hour
         else:
-            return datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour \
-                   - self.time_param.replace(tzinfo=None).hour
+            if datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(tzinfo=None).minute \
+                    - self.time_param.replace(tzinfo=None).minute < 0:
+                return int(datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour) \
+                       - self.time_param.replace(tzinfo=None).hour - 1
+            else:
+                return datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(tzinfo=None).hour \
+                       - self.time_param.replace(tzinfo=None).hour
 
     def get_minute(self):
         """
         Gets minutes count left to start or to the end of the class
         """
         if self.start is False:
-            self.delta_minute = self.time_param.replace(tzinfo=None).minute \
-                                - datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).minute
+            self.delta_minute = datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(tzinfo=None).minute \
+                                - self.time_param.replace(tzinfo=None).minute
             if self.delta_minute < 0:
-                self.hour -= 1
                 self.delta_minute = 60 - self.time_param.replace(tzinfo=None).minute \
                                     + datetime.strptime(data.end_time[int(self.id)], '%H:%M').replace(
                     tzinfo=None).minute
@@ -206,10 +221,9 @@ class DateAndTime:
             self.delta_minute = datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(tzinfo=None).minute \
                                 - self.time_param.replace(tzinfo=None).minute
             if self.delta_minute < 0:
-                self.hour -= 1
                 self.delta_minute = 60 - self.time_param.replace(tzinfo=None).minute \
-                                    + datetime.strptime(data.start_time[int(self.id)], '%H:%M').replace(
-                    tzinfo=None).minute
+                                    + datetime.strptime(data.start_time[int(self.id)],
+                                                        '%H:%M').replace(tzinfo=None).minute
         return self.delta_minute
 
     def time_to(self):
@@ -221,17 +235,16 @@ class DateAndTime:
                 and DateAndTime(time_param=self.time_param, start=True, element_id=self.id).get_minute() >= 0:
             #  If zero hour and more than or zero minutes left till start
             to_start = True
-        elif DateAndTime(time_param=self.time_param, element_id=self.id).get_hour() < 0:
-            #  If the time had already passes
+        elif DateAndTime(time_param=self.time_param, element_id=self.id).get_hour() > 0:
+            #  If the start time had already passes and more than an hour left till the end
             to_end = True
         elif DateAndTime(time_param=self.time_param, element_id=self.id).get_hour() == 0 \
-                and DateAndTime(time_param=self.time_param, element_id=self.id).get_minute() < 0:
-            #  If the time had already passed
+                and DateAndTime(time_param=self.time_param, element_id=self.id).get_minute() > 0:
+            #  If the start time had already passed and less than the end left till start
             to_end = True
         return to_start, to_end
 
 
-# noinspection PyUnboundLocalVariable
 class Classes(DateAndTime):
     """
     Processes all the data, connected with timetable
@@ -253,21 +266,22 @@ class Classes(DateAndTime):
         """
         Sets a correct case for minutes count
         """
-        minute = Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_minute()
-        if str(minute).endswith('1') and minute != 11:
+        self.minute = Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_minute()
+        print(str(self.minute)[-1])
+        if str(self.minute).endswith('1') and self.minute != 11:
             self.add_minute_str = 'минута'
-        elif str(minute).endswith('2' or '3' or '4') and minute in (12, 13, 14):
+        elif str(self.minute).endswith('2' or '3' or '4') and self.minute not in (12, 13, 14):
             self.add_minute_str = 'минуты'
         else:
             self.add_minute_str = 'минут'
-        return str(minute) + ' ' + self.add_minute_str
+        return str(self.minute) + ' ' + self.add_minute_str
 
     def hurry_up(self):
         """"
-        Adds some additional words, depending on the time left to class' start
+        Adds some additional words, depending on the time left to class' start or end
         """
-        self.minute = int(Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_minute())
-        self.hour = abs(Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_hour())
+        self.minute = Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_minute()
+        self.hour = Classes(time_param=self.time_param, element_id=self.id, start=self.start).get_hour()
         if self.start:
             if self.hour >= 1:
                 return ' Врeмени хватает'
@@ -275,11 +289,12 @@ class Classes(DateAndTime):
                 return ' Времени хватает. '
             elif 30 > self.minute >= 15:
                 return ' Времени на раскачку нет. '
-            elif 15 < self.minute <= 5:
+            elif 15 > self.minute >= 5:
                 return ' Не прозевай начало. '
-            elif 5 < self.minute <= 1:
+            elif 5 > self.minute >= 1:
                 return ' Совсем скоро начнется'
             else:
+                print(self.minute)
                 return ' Осталось меньше минуты. Поторопись!'
 
         else:
@@ -297,9 +312,9 @@ class Classes(DateAndTime):
                 return 'Почему ты об этом спрашиваешь?'
 
     def word_total(self):
-        self.w_hour = Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_hour()
-        self.w_minute = Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_minute()
-
+        """
+        Returns time left till start or end and hurries up
+        """
         return Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_hour() +\
                Classes(time_param=self.time_param, element_id=self.id, start=self.start).word_minute() +\
                '. ' + Classes(time_param=self.time_param, element_id=self.id, start=self.start).hurry_up() + '.\n'
