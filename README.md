@@ -1,5 +1,5 @@
 # vk_bot
-CURRENTLY BEING REFACTORED || В ТЕКУЩИЙ МОМЕНТ ПЕ
+CURRENTLY BEING REFACTORED || В ТЕКУЩИЙ МОМЕНТ ПЕРЕРАБАТЫВАЕТСЯ
 A chat bot created in order to make information available to all of the groupmates. || Чат-бот, созданный с целью донесения актуальной информации до одногруппников в ВУЗе.
 To use this bot you need to get an access token of the group || Чтобы использовать этого бота вам понадобится токен сообщества
 Some of the features are designed strikely for our group || Некоторые возможности были разработаны сугубо для нашей группы
